@@ -1,0 +1,80 @@
+Evaluación Reflexiva – PHP & MySQL
+3er Año – Ingeniería en Sistemas de Información
+-------------------------------------------------
+Estudiante: Kiara Gamarra
+Fecha: 10/11/2025
+
+Respuestas:
+-----------------------------------
+
+1. Porque es simple de arrancar (el stack LAMP/LEMP está en cualquier server), tiene enorme ecosistema (WordPress, frameworks, hosting barato), es rápido para prototipar y hay montones de devs y documentación. Además sigue evolucionando (mejoras en rendimiento y features modernas). Para proyectos web clásicos sigue siendo la opción pragmática.
+
+2. PDO es DB-agnostic: podés cambiar de MySQL a PostgreSQL con menos cambios.
+Su API para prepared statements es consistente y menos propensa a errores.
+Manejo de errores más flexible (exceptions).
+Mejor para escribir código portable y testable
+
+3. PHP prepara la consulta (si usás prepared statements), abre socket/connection al servidor DB, envía el SQL, el motor MySQL lo parsea, genera plan de ejecución, ejecuta (lee/escribe datos en disco/memoria), y devuelve resultado. PHP recibe el resultado y lo transforma en estructuras (arrays/objetos) que vos manejás. Todo eso implica I/O, parsing y posible acceso a cache/índices.
+
+4. Errores de sintaxis PHP: falla el parseo/compilación del script (ej: falta ;, paréntesis). Rompe antes de ejecutar.
+Errores de lógica con DB: el script corre pero la lógica produce resultados equivocados (consulta mal construida, joins incorrectos, condiciones que devuelven todo o nada). No son excepciones de sintaxis; son bugs de diseño o datos
+
+5. Para liberar recursos: conexiones abiertas consumen memoria y conexiones en el pool del servidor. En PHP con scripts cortos suele cerrarse al terminar el proceso igual, pero cerrarla explícitamente evita leaks en long-running processes o scripts CLI y mejora escalabilidad
+
+6. Usá prepared statements (PDO o mysqli) con binding de parámetros. Validá y sanitizá entradas (pero el binding es lo principal). Evitá concatenar variables directamente en SQL.
+
+7. Validar: comprobar formato y reglas (email válido, longitud, rango numérico). Rechazar si no cumple.
+Sanitizar: transformar/limpiar para evitar problemas (trim, strip_tags, escape).
+Primero validás (decisión), luego sanitizás si vas a mostrar o procesar.
+
+8. [Sin respuesta]
+
+9. Escapa caracteres especiales para usar en una query construida por concatenación. No alcanza porque: depende del charset, es fácil equivocarse (olvidarlo), y no protege contra errores de lógica o contextos distintos (ej: cuando no se escapa correctamente). Las prepared statements son la solución robusta.
+
+10. No mostrar stack trace ni detalles al usuario. Mostrar un mensaje genérico (“Error de servicio, reintentá más tarde”).
+Loggear el error completo en archivos seguros o sistema de logs (Sentry, syslog) con contexto.
+Retries/backoff y alertas a ops. En PDO: usar try/catch y manejar la excepción internamente.
+
+11. Tablas principales (simplificado):
+
+usuarios (id, nombre, email, rol)
+
+aulas (id, nombre, capacidad, recursos)
+
+reservas (id, usuario_id, aula_id, fecha_inicio, fecha_fin, motivo, estado)
+recursos (id, nombre)
+aula_recursos (aula_id, recurso_id) — relación N:N
+Relaciones: reservas.usuario_id -> usuarios.id, reservas.aula_id -> aulas.id. Índices en aula_id, fecha_inicio/fin y constraints para evitar solapamientos por lógica de aplicación o trigger/check.
+
+12. Medir tiempos: profiler en PHP (Xdebug, Tideways) para ver tiempo en PHP vs DB.
+Loggear tiempos por etapa: tiempo de conexión, tiempo de ejecución de query, time to first byte.
+Ejecutar la query directamente en el DB (mysql client) y ver su tiempo; revisar EXPLAIN para ver si necesita índices. Si la DB responde rápido y PHP es lento, se optimiza el código; si la DB es lenta, se omptimiza queries/índices o query plan.
+
+13. Cuando varias operaciones deben ser atómicas: ej. reservar un aula y decrementar disponibilidad, o insertar cabecera y detalles de una reserva. Usás BEGIN, si todo ok COMMIT, si algo falla ROLLBACK para evitar datos inconsistentes.
+
+14. password_hash() usa algoritmos adaptativos (bcrypt/argon2) con salt automático y costo configurable. Es resistente a ataques por fuerza bruta y rainbow tables.
+md5() es rápido, sin salt y obsoleto: vulnerable a colisiones y ataques masivos. No usar md5 para contraseñas.
+
+15. Es mucho peor: cada iteración genera latencia de red y overhead del DB. En vez de N queries en un bucle, preferir consultas en batch (JOIN, IN, bulk INSERT/UPDATE) o preparar statement y ejecutar en batch. Reduce round-trips y mejora throughput.
+
+16. Consultas en el Modelo. El Controller orquesta (llama al modelo y pasa datos a la vista). La Vista solo muestra datos. Ideal: modelos o repositorios que encapsulen consultas y lógica de acceso a datos.
+
+17. App funciona local pero falla en servidor — qué revisar primero
+Variables de entorno / credenciales (DB host, usuario, pass).
+Veriones de PHP/extensiones (pdo_mysql, mbstring), configuración (php.ini).
+Permisos de archivos, rutas absolutas, diferencias en codificación (charset).
+Logs (PHP, webserver, DB) para el error exacto.
+
+18. Seguridad: no versionás secrets en repo.
+Flexibilidad: diferentes config por entorno sin tocar código.
+Facilita despliegue/CI. Igual hay que proteger .env y usar gestión de secretos en producción (Vault, secretos del proveedor).
+
+19. Lo que está mal: es que se conecta la entrada directamente -> inyección SQL y errores si nombre contiene comillas. Mejora:
+$stmt = $pdo->prepare('SELECT * FROM usuarios WHERE nombre = :nombre');
+$stmt->execute([':nombre' => $_POST['nombre']]);
+$rows = $stmt->fetchAll();
+
+20. Usar un logger (Monolog o syslog) que guarde en ficheros rotados o servicios (Sentry, Logstash).
+Capturar excepciones con try/catch y loggeá el mensaje, stacktrace, user id, request id, pero no lo muestres al usuario.
+Mostrar al usuario un mensaje genérico y un código de incidente (p. ej. “Error 500 — ID: XYZ123”). Así el equipo puede buscar el ID en los logs.
+
