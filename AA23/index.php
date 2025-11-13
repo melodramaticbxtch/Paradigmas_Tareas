@@ -1,7 +1,3 @@
-<?php
-include('conexion.php');
-conectar();
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,6 +78,5 @@ conectar();
         </section>
     </main>
     <script src="js/script.js"></script>
-
 </body>
 </html>
